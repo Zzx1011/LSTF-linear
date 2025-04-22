@@ -1,3 +1,14 @@
+#!/bin/bash
+#SBATCH --account=rrg-timsbc
+#SBATCH --gpus-per-node=1
+#SBATCH --mem=16G              # memory per node
+#SBATCH --time=0-19:00
+source /home/zzx/projects/rrg-timsbc/zzx/bin/activate
+module load mpi4py/3.1.4 
+module load python/3.11
+module load scipy-stack
+echo "Running on $(date +%Y-%m-%d_%H-%M-%S) with PID $$"
+cd /home/zzx/projects/rrg-timsbc/zzx/LTSF-Linear
 
 if [ ! -d "./logs" ]; then
     mkdir ./logs
