@@ -51,11 +51,11 @@ def data_provider(args, flag):
         num_workers=args.num_workers,
         drop_last=drop_last)
     
-    for batch in data_loader:
-        if isinstance(batch, tuple):
-            for idx, item in enumerate(batch):
-                print(f"Batch item {idx} shape: {item.shape}")
-        else:
-            print(f"Batch shape: {batch.shape}")
-        break
+    # for batch in data_loader:
+    #     if isinstance(batch, tuple):
+    #         for idx, item in enumerate(batch):
+    #             print(f"Batch item {idx} shape: {item.shape}")
+    #     else:
+    #         print(f"Batch shape: {batch.shape}")
+    #     break
     return data_set, data_loader
