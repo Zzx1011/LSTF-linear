@@ -120,16 +120,20 @@ class Dataset_ETT_hour(Dataset):
         # return group_data, seq_y, seq_x_mark, seq_y_mark
         return seq_x, seq_y, seq_x_mark, seq_y_mark
     
-    def get_group(self):
-        groups = [[0, 2, 6], [1, 3], [4, 5]]
-        datasets = []
+    # def get_group(self):
+    #     groups = [[0, 2, 6], [1, 3], [4, 5]]
+    #     datasets = []
 
-        for feature_indices in groups:
-            dataset = GroupDataset(self, feature_indices)
-            datasets.append(dataset)
+    #     for feature_indices in groups:
+    #         dataset = GroupDataset(self, feature_indices)
+    #         datasets.append(dataset)
 
-        return datasets
+    #     return datasets
 
+    def get_group(self, feature_indices):
+        # Create a new dataset with the specified feature indices
+        group_dataset = GroupDataset(self, feature_indices)
+        return group_dataset
 
     def __len__(self):
         return len(self.data_x) - self.seq_len - self.pred_len + 1

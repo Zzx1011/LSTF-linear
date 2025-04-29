@@ -60,7 +60,7 @@ class Exp_Main(Exp_Basic):
         self.model.eval()
         with torch.no_grad():
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
-                batch_x = [x.float().to(self.device) for x in batch_x]
+                batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float()
 
                 batch_x_mark = batch_x_mark.float().to(self.device)
@@ -124,6 +124,9 @@ class Exp_Main(Exp_Basic):
 
         for group_idx, train_loader in enumerate(train_loader_list):
             print(f"Training group {group_idx}...")
+            path = os.path.join(self.args.checkpoints, setting, f"group_{group_idx}")
+            if not os.path.exists(path):
+                os.makedirs(path)
 
             for epoch in range(self.args.train_epochs):
                 iter_count = 0
@@ -135,7 +138,7 @@ class Exp_Main(Exp_Basic):
                     iter_count += 1
                     model_optim.zero_grad()
 
-                    batch_x = [x.float().to(self.device) for x in batch_x]
+                    batch_x = batch_x.float().to(self.device)
                     batch_y = batch_y.float().to(self.device)
                     batch_x_mark = batch_x_mark.float().to(self.device)
                     batch_y_mark = batch_y_mark.float().to(self.device)
@@ -212,30 +215,36 @@ class Exp_Main(Exp_Basic):
                 adjust_learning_rate(model_optim, epoch + 1, self.args)
 
         best_model_path = path + '/' + 'checkpoint.pth'
-        self.model.load_state_dict(torch.load(best_model_path))
+        # self.model.load_state_dict(torch.load(best_model_path))
 
         return self.model
 
     def test(self, setting, test=0):
         test_data_list, test_loader_list = self._get_data(flag='test')
-        
-        if test:
-            print('loading model')
-            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
 
-        preds = []
-        trues = []
-        inputx = []
+        preds_group = []
+        trues_group = []
+
         folder_path = './test_results/' + setting + '/'
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
-        self.model.eval()
+        for group_idx, test_loader in enumerate(test_loader_list):
+            # === 加载每组自己的 best checkpoint
+            if test:
+                print(f'Loading model for group {group_idx}')
+                group_ckpt_path = os.path.join('./checkpoints/', setting, f'group_{group_idx}', 'checkpoint.pth')
+                self.model.load_state_dict(torch.load(group_ckpt_path))
 
-        with torch.no_grad():
-            for group_idx, test_loader in enumerate(test_loader_list):
+            preds = []
+            trues = []
+            inputx = []
+
+            self.model.eval()
+
+            with torch.no_grad():
                 for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(test_loader):
-                    batch_x = [x.float().to(self.device) for x in batch_x]
+                    batch_x = batch_x.float().to(self.device)
                     batch_y = batch_y.float().to(self.device)
                     batch_x_mark = batch_x_mark.float().to(self.device)
                     batch_y_mark = batch_y_mark.float().to(self.device)
@@ -277,24 +286,28 @@ class Exp_Main(Exp_Basic):
                         input_sample = batch_x[0].detach().cpu().numpy()
                         gt = np.concatenate((input_sample[:, -1], true[0, :, -1]), axis=0)
                         pd = np.concatenate((input_sample[:, -1], pred[0, :, -1]), axis=0)
-                        visual(gt, pd, os.path.join(folder_path, str(group_idx) + '_' + str(i) + '.pdf'))
+                        visual(gt, pd, os.path.join(folder_path, f"group{group_idx}_{i}.pdf"))
 
-        if self.args.test_flop:
-            test_params_flop((batch_x[0].shape[1], batch_x[0].shape[2]))
-            exit()
+            # 拼接 batch 维度 (axis=0)，不要拼特征！！
+            preds = np.concatenate(preds, axis=0)  # (batch_size, pred_len, group_feature_dim)
+            trues = np.concatenate(trues, axis=0)
 
-        preds = np.concatenate(preds, axis=-1)  # 拼接特征
-        trues = np.concatenate(trues, axis=-1)
-        inputx = np.concatenate(inputx, axis=0)
+            preds_group.append(preds)  # 保存每组结果
+            trues_group.append(trues)
+
+        # === 所有 group 拼回完整的特征 ===
+        preds = np.concatenate(preds_group, axis=-1)  # 在特征维度拼接
+        trues = np.concatenate(trues_group, axis=-1)
 
         print('test shape:', preds.shape, trues.shape)
+        # (batch_size, pred_len, total_feature_dim)
 
         # 保存总的测试结果
         result_folder = './results/' + setting + '/'
         if not os.path.exists(result_folder):
             os.makedirs(result_folder)
 
-        # 单独计算每个特征的MSE
+        # 单独计算每个特征的 MSE
         mse_per_feature = []
         for i in range(preds.shape[-1]):
             mse_i = np.mean((preds[..., i] - trues[..., i]) ** 2)
@@ -315,7 +328,6 @@ class Exp_Main(Exp_Basic):
 
         np.save(os.path.join(result_folder, 'pred.npy'), preds)
         np.save(os.path.join(result_folder, 'true.npy'), trues)
-        np.save(os.path.join(result_folder, 'inputx.npy'), inputx)
 
         return
 
