@@ -140,6 +140,8 @@ class Exp_Main(Exp_Basic):
 
                     batch_x = batch_x.float().to(self.device)
                     batch_y = batch_y.float().to(self.device)
+                    print("batch_x shape:", batch_x.shape)
+                    print("batch_y shape:", batch_y.shape)
                     batch_x_mark = batch_x_mark.float().to(self.device)
                     batch_y_mark = batch_y_mark.float().to(self.device)
 
@@ -168,6 +170,14 @@ class Exp_Main(Exp_Basic):
                                 outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
                             else:
                                 outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
+
+                        # # reshape back to [B, pred_len, C]
+                        # CB, pred_len, _ = outputs.shape
+                        # C = 3 if group_idx == 0 else 2
+                        # B = CB // C
+                        # outputs = outputs.reshape(C, B, pred_len).permute(1, 2, 0)  # -> [B, pred_len, C]
+                        # batch_y = batch_y.reshape(C, B, pred_len).permute(1, 2, 0)
+
 
                         f_dim = -1 if self.args.features == 'MS' else 0
                         outputs = outputs[:, -self.args.pred_len:, f_dim:]
@@ -219,6 +229,42 @@ class Exp_Main(Exp_Basic):
 
         return self.model
 
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import os
+
+    def visual_test(self, setting):
+        test_data_list, test_loader_list = self._get_data(flag='test')
+
+        folder_path = f'./feature_visualization/{setting}/'
+        os.makedirs(folder_path, exist_ok=True)
+
+        for group_idx, test_loader in enumerate(test_loader_list):
+            all_x = []
+
+            for batch_x, _, _, _ in test_loader:
+                batch_x = batch_x.cpu().numpy()  # (B, input_len, C)
+                all_x.append(batch_x)
+
+            all_x = np.concatenate(all_x, axis=0)  # (total_samples, input_len, C)
+            input_len = all_x.shape[1]
+            num_features = all_x.shape[2]
+
+
+
+            plt.figure(figsize=(16, 6))
+            for feature_idx in range(num_features):
+                plt.plot(all_x[feature_idx], label=f'Feature {feature_idx}', linewidth=1)
+
+            plt.xlabel('Time Step')
+            plt.ylabel('Value')
+            plt.title(f'Input Sequence Visualization - Group {group_idx}')
+            plt.legend(loc='upper right', fontsize='small', ncol=2)
+            plt.tight_layout()
+            plt.savefig(os.path.join(folder_path, f'group{group_idx}_input_only.png'))
+            plt.close()
+
+        
     def test(self, setting, test=0):
         test_data_list, test_loader_list = self._get_data(flag='test')
 
@@ -301,6 +347,40 @@ class Exp_Main(Exp_Basic):
 
         print('test shape:', preds.shape, trues.shape)
         # (batch_size, pred_len, total_feature_dim)
+
+        # 选择第一个样本进行可视化
+        sample_idx = 0
+        pred_sample = preds[sample_idx]  # shape: (pred_len, total_feature_dim)
+        true_sample = trues[sample_idx]  # shape: (pred_len, total_feature_dim)
+
+        plt.figure(figsize=(12, 6))
+        for i in range(pred_sample.shape[1]):  # 遍历所有特征
+            plt.plot(true_sample[:, i], label=f'True F{i}', linestyle='--')
+            plt.plot(pred_sample[:, i], label=f'Pred F{i}')
+
+        plt.xlabel('Time step')
+        plt.ylabel('Value')
+        plt.title(f'Prediction vs True (Sample {sample_idx})')
+        plt.legend(ncol=2, fontsize='small')
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(os.path.join(folder_path, f'pred_vs_true_sample{sample_idx}.png'))
+        plt.show()
+
+        # 计算预测值和真实值的相关系数
+        preds_feature1 = preds[:, :, 1].flatten()  
+        preds_feature3 = preds[:, :, 3].flatten()
+        trues_feature1 = trues[:, :, 1].flatten()
+        trues_feature3 = trues[:, :, 3].flatten()
+
+        # 计算预测值中 feature1 和 feature3 的相关系数
+        corr_preds = np.corrcoef(preds_feature1, preds_feature3)[0, 1]
+
+        # 计算真实值中 feature1 和 feature3 的相关系数
+        corr_trues = np.corrcoef(trues_feature1, trues_feature3)[0, 1]
+
+        print(f"Correlation in PREDICTIONS (feature1 vs feature3): {corr_preds:.4f}")
+        print(f"Correlation in GROUND TRUTH (feature1 vs feature3): {corr_trues:.4f}")
 
         # 保存总的测试结果
         result_folder = './results/' + setting + '/'

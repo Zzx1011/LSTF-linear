@@ -287,11 +287,19 @@ class Exp_Main(Exp_Basic):
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
+        mse_per_feature = []
+        for i in range(preds.shape[-1]):
+            mse_i = np.mean((preds[..., i] - trues[..., i]) ** 2)
+            mse_per_feature.append(mse_i)
+            print(f"Feature {i} MSE: {mse_i:.6f}")
+
         mae, mse, rmse, mape, mspe, rse, corr = metric(preds, trues)
         print('mse:{}, mae:{}'.format(mse, mae))
         f = open("result.txt", 'a')
         f.write(setting + "  \n")
         f.write('mse:{}, mae:{}, rse:{}, corr:{}'.format(mse, mae, rse, corr))
+        for i, mse_i in enumerate(mse_per_feature):
+            f.write(f"Feature {i} mse: {mse_i:.6f}\n")
         f.write('\n')
         f.write('\n')
         f.close()

@@ -118,6 +118,8 @@ if args.is_training:
             args.des, ii)
 
         exp = Exp(args)  # set experiments
+        exp.visual_test(setting)
+        print('end')
         print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
         exp.train(setting)
 

@@ -18,10 +18,20 @@ class GroupDataset(Dataset):
         self.base_dataset = base_dataset
         self.feature_indices = feature_indices
 
+    # def reshape_input(self, x):  # [B, T, C] -> [C*B, T, 1]
+    #     B, T, C = x.shape
+    #     return x.permute(2, 0, 1).reshape(C * B, T, 1)
+
+    # def reshape_output(self, y, C):  # [C*B, T, 1] -> [B, T, C]
+    #     y = y.reshape(C, -1, y.shape[1], 1)  # [C, B, T, 1]
+    #     return y.permute(1, 2, 0, 3).squeeze(-1)  # [B, T, C]
+    
     def __getitem__(self, index):
         batch_x, batch_y, batch_x_mark, batch_y_mark = self.base_dataset[index]
         batch_x = batch_x[..., self.feature_indices]
         batch_y = batch_y[..., self.feature_indices]
+        # batch_x = self.reshape_input(batch_x)
+        # batch_y = self.reshape_input(batch_y)
         return batch_x, batch_y, batch_x_mark, batch_y_mark
 
     def __len__(self):
